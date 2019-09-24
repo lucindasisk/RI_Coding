@@ -11,7 +11,7 @@ $\\$
 
 Elastic Net produces a regression model that is penalized with both the L1-norm and L2-norm. The consequence of this is to effectively shrink coefficients (like in ridge regression) and to set some coefficients to zero (as in LASSO).
 
-(STHDA Resource)[ http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/153-penalized-regression-essentials-ridge-lasso-elastic-net/#elastic-net]
+### Example using (stack overflow)[https://stackoverflow.com/questions/47732633/extract-data-from-glmnet-output-data]
 
 ```{r setup, include=FALSE}
 library(tidyverse)
@@ -19,34 +19,90 @@ library(caret)
 library(glmnet)
 
 #Subset example data into predictor and outcome variables
+data(iris)
+predictor_iris <- model.matrix(~., iris)[,2:5]
+outcome_iris <- iris$Species %>%
+    as_factor()
 
-example_data <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/CTQ_ROI_SCR_SOBP2019_data_set_04.28.19_FINAL.csv')
+# Build the model using the training set
+model_iris <- cv.glmnet(x = predictor_iris,
+                        y = outcome_iris,
+                      family = "multinomial",
+                      alpha = 1,
+                      nfolds = 5,
+                      intercept = FALSE)
 
-outcome_vars <- example_data %>%
-    select(Shapes2_Aminus, subj_id)
+# Best tuning parameter (smallest lambda)
+(coef(model_iris, s="lambda.min"))
 
-predictor_vars <- example_data %>%
-    select(subj_id, Sex_Final, Age_Final,
-           Hindy_L_AntHipp_test1_ABminus_predot:Hindy_L_AntHipp_test1_AllShapes_dot)
+#See best lambda
+(model_iris$lambda[which.min(model_iris$cvm)])
 
-#Elastic Net Regression
+#### TEST MODEL ####
+#Make testing model
+test_model_iris <- glmnet(x = predictor_iris,
+                    y = outcome_iris,
+                    family="multinomial",
+                    alpha=1,
+                    intercept=FALSE)
 
-# Build the model
+#Extract meaning from model... ?
+plot(test_model_iris, xvar = "lambda") +
+abline(v = log(model_iris$lambda[which.min(model_iris$cvm)]), col="purple")
+
+```
+
+Extract variable names (from this Stack Overflow answer)[https://stackoverflow.com/questions/27801130/extracting-coefficient-variable-names-from-glmnet-into-a-data-frame]
+```{r}
+(tmp_coeffs <- coef(model_iris, s = "lambda.min"))
+dimnames(coef(model_iris))
+
+```
+
+### Example using (STHDA Resource)[ http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/153-penalized-regression-essentials-ridge-lasso-elastic-net/#elastic-net ]
+```{r}
+data("Boston", package="MASS")
+
+# Split the data into training and test set
 set.seed(123)
-elastic <- train(
-  example_data, data = train.data, method = "glmnet",
+training.samples <- Boston$medv %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- Boston[training.samples, ]
+test.data <- Boston[-training.samples, ]
+
+# Predictor variables
+predictors <- model.matrix(medv~., train.data)[,-1]
+# Outcome variable
+outcomes <- train.data$medv
+
+# Build the model using the training set
+set.seed(123)
+model_train <- train(
+  medv ~., data = train.data, method = "glmnet",
   trControl = trainControl("cv", number = 10),
   tuneLength = 10
-  )
-# Model coefficients
-coef(elastic$finalModel, elastic$bestTune$lambda)
-# Make predictions
-predictions <- elastic %>% predict(test.data)
-# Model prediction performance
+)
+# Best tuning parameter
+model_train$bestTune
+
+# Coefficient of the final model. You need
+# to specify the best lambda
+coef(model_train$finalModel, model_train$bestTune$lambda)
+
+# Make predictions on the test data
+x.test <- model.matrix(medv ~., test.data)[,-1]
+predictions <- model_train %>% predict(x.test)
+# Model performance metrics
 data.frame(
   RMSE = RMSE(predictions, test.data$medv),
   Rsquare = R2(predictions, test.data$medv)
 )
+
+# Extract meaning from model???
+plot(model_train, xvar = "lambda")
+
+coeffs <- coef(model_train$finalModel, model_train$bestTune$lambda) %>%
+    tibble()
 
 ```
 
@@ -56,7 +112,29 @@ data.frame(
 
 2. Do we need to pull samples from the same dataframe, two different data frames, or does it not matter?
 
+3. We tried modeling this as in an online tutorial, but got different parameters for $\alpha$ and $\lambda$ than the tutorial did. Is this attributable to different versions/a newer release of R? $\alpha$: 0.1 $\lambda$: 0.03875385. In example,  $\alpha$: 0.1 $\lambda$: 0.21.
 
+4. What is the coef function (coef(model$finalModel, model$bestTune$lambda)) doing here? 
+
+
+
+```{r}
+# Unsuccessful attempt to replicate with our data
+
+# example_data <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/CTQ_ROI_SCR_SOBP2019_data_set_04.28.19_FINAL.csv') 
+outcome_vars <- example_data %>%
+    select(Shapes2_Aminus) %>%
+    as_vector() %>%
+    replace_na(0) 
+
+predictor_vars <- example_data %>%
+    select(Sex_Final, Age_Final,
+           Hindy_L_AntHipp_test1_ABminus_predot:Hindy_L_AntHipp_test1_AllShapes_dot) %>%
+    replace_na(list(x = 0, y = 0)) 
+
+predictor_vars2 <- model.matrix( ~ ., predictor_vars)
+
+```
 
 
 
