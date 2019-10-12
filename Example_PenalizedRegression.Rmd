@@ -2,18 +2,81 @@
 title: "Example_PenalizedRegression"
 author: "Lucinda Sisk"
 date: "9/19/2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
+
 
 ###Elastic Net
 
-$\\$
 
 Elastic Net produces a regression model that is penalized with both the L1-norm and L2-norm. The consequence of this is to effectively shrink coefficients (like in ridge regression) and to set some coefficients to zero (as in LASSO).
 
-### Example using (stack overflow)[https://stackoverflow.com/questions/47732633/extract-data-from-glmnet-output-data]
+Code derived from [**stack overflow - click for link **](https://stackoverflow.com/questions/47732633/extract-data-from-glmnet-output-data)
 
-```{r setup, include=FALSE}
+
+```{r}
+
+stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/dummyData/meeting_dummy_data_10.10.19.csv')
+
+
+
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+#Subset example data into predictor and outcome variables
+stress_age_vars <- stress[2:56,2:31]
+predictor_stress <- model.matrix(~., stress_age_vars)
+outcome_stress <- stress$brain_dv_1[2:56] 
+
+# Build the model using the training set
+model_stress <- cv.glmnet(x = predictor_stress,
+                        y = outcome_stress, 
+                        family = 'gaussian',#if outcome is continuous, gaussian
+                        alpha = .5, #alpha=0.5 *check
+                        nfolds = 5, #number of crossfold validations you want to do,
+                        standardize.response = TRUE,
+                        intercept = FALSE)
+
+# Best tuning parameter (smallest lambda)
+(coef(model_stress, s="lambda.min")) #if you just run the cv.glmnet, will give you ~100 diff results, want to use tuning parameter that give you minimum square error. This gets the coefficient that gives you the minimum square error
+
+#See best lambda
+(model_stress$lambda[which.min(model_stress$cvm)]) #This saying waht will be the tuning parameter; not important to report for results
+
+#### TEST MODEL ####
+#Make testing model
+test_model_stress <- glmnet(x = predictor_stress,
+                            y = outcome_stress,
+                            family="gaussian",
+                            alpha=1,
+                            intercept=FALSE)
+
+
+
+
+
+
+
+(tmp_coeffs <- coef(model_stress, s = "lambda.min"))
+dimnames(coef(model_stress)) #The second value in this vector will be linked to the predictors
+#glmnet doen't automatically generate p-value
+#Second package to plug in coefficients; this will give p-value
+
+```
+
+
+$\\$
+
+
+
+Elastic Net produces a regression model that is penalized with both the L1-norm and L2-norm. The consequence of this is to effectively shrink coefficients (like in ridge regression) and to set some coefficients to zero (as in LASSO).
+
+Example using [**stack overflow - click for link **](https://stackoverflow.com/questions/47732633/extract-data-from-glmnet-output-data)
+
+```{r}
 library(tidyverse)
 library(caret)
 library(glmnet)
@@ -27,16 +90,16 @@ outcome_iris <- iris$Species %>%
 # Build the model using the training set
 model_iris <- cv.glmnet(x = predictor_iris,
                         y = outcome_iris,
-                      family = "multinomial",
-                      alpha = 1,
-                      nfolds = 5,
+                      family = "multinomial", #if outcome is continuous, gaussian
+                      alpha = 1, #alpha=0.5 *check
+                      nfolds = 5, #number of crossfold validations you want to do
                       intercept = FALSE)
 
 # Best tuning parameter (smallest lambda)
-(coef(model_iris, s="lambda.min"))
+(coef(model_iris, s="lambda.min")) #if you just run the cv.glmnet, will give you ~100 diff results, want to use tuning parameter that give you minimum square error. This gets the coefficient that gives you the minimum square error
 
 #See best lambda
-(model_iris$lambda[which.min(model_iris$cvm)])
+(model_iris$lambda[which.min(model_iris$cvm)]) #This saying waht will be the tuning parameter; not important to report for results
 
 #### TEST MODEL ####
 #Make testing model
@@ -52,14 +115,24 @@ abline(v = log(model_iris$lambda[which.min(model_iris$cvm)]), col="purple")
 
 ```
 
-Extract variable names (from this Stack Overflow answer)[https://stackoverflow.com/questions/27801130/extracting-coefficient-variable-names-from-glmnet-into-a-data-frame]
+
+Extract variable names [**from this Stack Overflow answer - click for link**](https://stackoverflow.com/questions/27801130/extracting-coefficient-variable-names-from-glmnet-into-a-data-frame)
+
+
 ```{r}
 (tmp_coeffs <- coef(model_iris, s = "lambda.min"))
-dimnames(coef(model_iris))
+dimnames(coef(model_iris)) #The second value in this vector will be linked to the predictors
+#glmnet doen't automatically generate p-value
+#Second package to plug in coefficients; this will give p-value
 
 ```
 
-### Example using (STHDA Resource)[ http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/153-penalized-regression-essentials-ridge-lasso-elastic-net/#elastic-net ]
+$\\$
+
+
+
+
+### Example using [**STHDA Resource - click for link**]( http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/153-penalized-regression-essentials-ridge-lasso-elastic-net/#elastic-net )
 ```{r}
 data("Boston", package="MASS")
 
@@ -101,8 +174,8 @@ data.frame(
 # Extract meaning from model???
 plot(model_train, xvar = "lambda")
 
-coeffs <- coef(model_train$finalModel, model_train$bestTune$lambda) %>%
-    tibble()
+# coeffs <- coef(model_train$finalModel, model_train$bestTune$lambda) %>%
+#     tibble()
 
 ```
 
@@ -122,17 +195,17 @@ coeffs <- coef(model_train$finalModel, model_train$bestTune$lambda) %>%
 # Unsuccessful attempt to replicate with our data
 
 # example_data <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/CTQ_ROI_SCR_SOBP2019_data_set_04.28.19_FINAL.csv') 
-outcome_vars <- example_data %>%
-    select(Shapes2_Aminus) %>%
-    as_vector() %>%
-    replace_na(0) 
-
-predictor_vars <- example_data %>%
-    select(Sex_Final, Age_Final,
-           Hindy_L_AntHipp_test1_ABminus_predot:Hindy_L_AntHipp_test1_AllShapes_dot) %>%
-    replace_na(list(x = 0, y = 0)) 
-
-predictor_vars2 <- model.matrix( ~ ., predictor_vars)
+# outcome_vars <- example_data %>%
+#     select(Shapes2_Aminus) %>%
+#     as_vector() %>%
+#     replace_na(0) 
+# 
+# predictor_vars <- example_data %>%
+#     select(Sex_Final, Age_Final,
+#            Hindy_L_AntHipp_test1_ABminus_predot:Hindy_L_AntHipp_test1_AllShapes_dot) %>%
+#     replace_na(list(x = 0, y = 0)) 
+# 
+# predictor_vars2 <- model.matrix( ~ ., predictor_vars)
 
 ```
 
