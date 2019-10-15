@@ -18,13 +18,12 @@ Code derived from [**stack overflow - click for link **](https://stackoverflow.c
 
 ```{r}
 
-stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/dummyData/meeting_dummy_data_10.10.19.csv')
-
-
-
 library(tidyverse)
 library(caret)
 library(glmnet)
+
+stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/dummyData/meeting_dummy_data_10.10.19.csv')
+
 
 #Subset example data into predictor and outcome variables
 stress_age_vars <- stress[2:56,2:31]
@@ -36,22 +35,22 @@ model_stress <- cv.glmnet(x = predictor_stress,
                         y = outcome_stress, 
                         family = 'gaussian',#if outcome is continuous, gaussian
                         alpha = .5, #alpha=0.5 *check
-                        nfolds = 5, #number of crossfold validations you want to do,
-                        standardize.response = TRUE,
+                        nfolds = 10, #number of crossfold validations you want to do,
                         intercept = FALSE)
 
 # Best tuning parameter (smallest lambda)
 (coef(model_stress, s="lambda.min")) #if you just run the cv.glmnet, will give you ~100 diff results, want to use tuning parameter that give you minimum square error. This gets the coefficient that gives you the minimum square error
 
 #See best lambda
-(model_stress$lambda[which.min(model_stress$cvm)]) #This saying waht will be the tuning parameter; not important to report for results
+best_lambda_test <- (model_stress$lambda[which.min(model_stress$cvm)]) #This saying waht will be the tuning parameter; not important to report for results
 
 #### TEST MODEL ####
 #Make testing model
 test_model_stress <- glmnet(x = predictor_stress,
                             y = outcome_stress,
+                            lambda = best_lambda_test,
                             family="gaussian",
-                            alpha=1,
+                            alpha=.5,
                             intercept=FALSE)
 
 
@@ -60,13 +59,76 @@ test_model_stress <- glmnet(x = predictor_stress,
 
 
 
-(tmp_coeffs <- coef(model_stress, s = "lambda.min"))
-dimnames(coef(model_stress)) #The second value in this vector will be linked to the predictors
+(tmp_coeffs <- coef(test_model_stress, s = "lambda.min"))
+dimnames(coef(test_model_stress)) #The second value in this vector will be linked to the predictors
 #glmnet doen't automatically generate p-value
 #Second package to plug in coefficients; this will give p-value
 
+coeff12 <- '0.008418605'
+coeff13 <- '0.010114621'
+coeff17 <- '0.021770395'
+coeff21 <- '0.002606253'
+coeff22 <- '0.003842865'
+
 ```
 
+
+```{r}
+#Bootstrapping to create null distribution and test coefficient significance
+#Subset example data into predictor and outcome variables
+
+stress_age_vars <- stress[2:56,2:31]
+predictor_stress <- model.matrix(~., stress_age_vars)
+outcome_stress <- stress$brain_dv_1[2:56] 
+
+
+null_dist <- NULL
+for (i in 1:10){
+   
+  #Randomize variables
+  stress_age_rand <- stress_age_vars[sample(1:56, 56, replace = FALSE), ] # Fix this so randomizes whole table
+  outcome_stress_rand <- sample(stress$brain_dv_1[2:56] )
+  predictor_stress_rand <- model.matrix(~., stress_age_rand)
+  
+  #Rerun test model
+  model_stress_rand <- cv.glmnet(x = predictor_stress_rand,
+                        y = outcome_stress_rand, 
+                        family = 'gaussian',#if outcome is continuous, gaussian
+                        alpha = .5, #alpha=0.5 *check
+                        nfolds = 10, #number of crossfold validations you want to do,
+                        intercept = FALSE)
+  
+  rand_coefs <- (coef(model_stress_rand, s="lambda.min"))
+  rand_coefs_dropped <- tibble(lapply(rand_coefs@x, function(x) {x[x!=0]}))
+  null_dist[[i]] <- rand_coefs_dropped
+  
+}
+  
+
+hist(null_dist,
+     nclass=50)
+
+
+
+
+
+# Build the model using the training set
+
+
+# Best tuning parameter (smallest lambda)
+ #if you just run the cv.glmnet, will give you ~100 diff results, want to use tuning parameter that give you minimum square error. This gets the coefficient that gives you the minimum square error
+
+
+
+
+```
+
+
+
+
+
+
+# Examples from the internet
 
 $\\$
 
@@ -114,6 +176,11 @@ plot(test_model_iris, xvar = "lambda") +
 abline(v = log(model_iris$lambda[which.min(model_iris$cvm)]), col="purple")
 
 ```
+
+#Office hrs: replicate by splitting data in half multiple times (random sampling)
+#Do both that and p-value testing
+  * Get residuals from test set; check if it is better than real set; try leave one out testign
+  * Check if y-yhat is better for real data than when you shuffle the data
 
 
 Extract variable names [**from this Stack Overflow answer - click for link**](https://stackoverflow.com/questions/27801130/extracting-coefficient-variable-names-from-glmnet-into-a-data-frame)
