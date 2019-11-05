@@ -22,18 +22,27 @@ library(tidyverse)
 library(caret)
 library(glmnet)
 
-stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/dummyData/meeting_dummy_data_10.10.19.csv')
+stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/dummyData/meeting_dummy_data_10.10.19.csv') 
+stress_arrange <- stress %>%
+  select(-c('brain_dv_1':'brain_dv_4'))
 
 
 #Subset example data into predictor and outcome variables
-stress_age_vars <- stress[2:56,2:31]
+stress_age_vars <- stress_arrange[2:56,2:32]
 predictor_stress <- model.matrix(~., stress_age_vars)
+#covariate_vars <- stress[["sex"]][2:length(stress)]
+#covariate_matrix <- model.matrix(covariate_vars)
 outcome_stress <- stress$brain_dv_1[2:56] 
+
+#Set Penalty factors for sex (https://cran.r-project.org/web/packages/glmnet/vignettes/glmnet_beta.pdf)
+pfac <- rep(1,32)
+pfac[c(32)] = 0 
 
 # Build the model using the training set
 model_stress <- cv.glmnet(x = predictor_stress,
                         y = outcome_stress, 
-                        family = 'gaussian',#if outcome is continuous, gaussian
+                        penalty.factor = pfac,
+                        family = 'gaussian', #if outcome is continuous, gaussian
                         alpha = .5, #alpha=0.5 *check
                         nfolds = 10, #number of crossfold validations you want to do,
                         intercept = FALSE)
@@ -48,15 +57,11 @@ best_lambda_test <- (model_stress$lambda[which.min(model_stress$cvm)]) #This say
 #Make testing model
 test_model_stress <- glmnet(x = predictor_stress,
                             y = outcome_stress,
+                            penalty.factor = pfac,
                             lambda = best_lambda_test,
                             family="gaussian",
-                            alpha=.5,
+                            alpha=0.5,
                             intercept=FALSE)
-
-
-
-
-
 
 
 (tmp_coeffs <- coef(test_model_stress, s = "lambda.min"))
@@ -64,14 +69,38 @@ dimnames(coef(test_model_stress)) #The second value in this vector will be linke
 #glmnet doen't automatically generate p-value
 #Second package to plug in coefficients; this will give p-value
 
-coeff12 <- '0.008418605'
-coeff13 <- '0.010114621'
-coeff17 <- '0.021770395'
-coeff21 <- '0.002606253'
-coeff22 <- '0.003842865'
+#Plot model
+plot(test_model_stress, xvar="lambda", label=TRUE)
 
+## Linear models (we can't interpret coefficients from elastic net: see https://stats.stackexchange.com/questions/274813/interpretation-of-positive-negative-and-magnitude-of-coefficients-in-lasso)
+
+m1 <- lm(brain_dv_1 ~ endorse_any_12 + sex, stress)
+summary(m1)
+
+m2 <- lm(brain_dv_1 ~ endorse_any_13 + sex, stress)
+summary(m2)
+
+m3 <- lm(brain_dv_1~endorse_any_17 + sex, stress)
+summary(m3)
+
+plot(x=stress$endorse_any_17, y=stress$brain_dv_1, xlim=c(0,5))
 ```
 
+```{r}
+stress_sum <- stress %>%
+  select(-c('ucla_a_id')) %>%
+  summarise_all(funs(sum)) %>%
+  as.numeric()
+  #add_column('ucla_a_id' = 'mean', .before=TRUE)
+
+# stress_only <- stress %>%
+#   rbind(stress_sum)
+
+#stress_sum <- t(data.frame(stress_sum))
+names=c(0:30)
+barplot(stress_sum,  cex.axis=1)
+
+```
 
 ```{r}
 #Bootstrapping to create null distribution and test coefficient significance
@@ -172,7 +201,7 @@ test_model_iris <- glmnet(x = predictor_iris,
                     intercept=FALSE)
 
 #Extract meaning from model... ?
-plot(test_model_iris, xvar = "lambda") +
+plot(test_model_iris, xvar = "lambda", label = TRUE) +
 abline(v = log(model_iris$lambda[which.min(model_iris$cvm)]), col="purple")
 
 ```
