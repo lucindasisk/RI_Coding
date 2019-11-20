@@ -31,7 +31,13 @@ Random Forest in R Tutorial: [Link Here](https://towardsdatascience.com/random-f
 
 R-bloggers Random Forest in depth:[Link Here](https://www.r-bloggers.com/random-forests-in-r/)
 
+Berkeley Stats Information Page: [Link Here](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm)
+
+A Random Forest Guided Tour: Introductory paper [Link Here](https://www.normalesup.org/~scornet/paper/test.pdf)
+
 ```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+library(randomForest)
+require(caTools)
 
 #Check that variables in dummy dataset are coded correctly
 sapply(stress, class)
@@ -73,7 +79,7 @@ plot(rf_mod)
 #By default, the number of decision trees in the forest is 500 and the number of features used as potential candidates for each split is 3. The model will automatically attempt to classify each of the samples in the Out-Of-Bag dataset and display a confusion matrix with the results.
 
 #Now, we use our model to predict whether the people in our testing set have heart disease.
-pred = predict(rf_mod, newdata=test[-31])
+(pred = predict(rf_mod, newdata=test[-31]))
 
 
 ```

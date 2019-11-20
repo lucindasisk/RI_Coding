@@ -1,0 +1,376 @@
+---
+title: "Visualize_RI_Data"
+author: "Lucinda Sisk"
+date: "11/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(stringr)
+library(wesanderson)
+
+#Drop extra row listing ages
+demo <- read_csv('/Users/lucindasisk/Desktop/Milgram/candlab/analyses/shapes/dwi/lucindasisk/demographics/SHAPES_Demographics_PCT_11.13.19.csv') 
+
+stress <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/LS_results/Cleaned_WIDE_any_endorsements_2019-08-20_manualedits.csv')[2:91,]  %>%
+    rename(ID = X1) %>%
+    merge(demo, by="ID", all=TRUE)
+
+thr <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/LS_results/Cleaned_WIDE_threat_endorsements_2019-11-11_manualedits.csv')[2:91,] %>%
+    rename(ID = X1) %>%
+    merge(demo, by="ID", all=TRUE)
+
+dep <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/LS_results/Cleaned_WIDE_dep_endorsements_2019-11-11_manualedits.csv')[2:91,] %>%
+    rename(ID = X1) %>%
+    merge(demo, by="ID", all=TRUE)
+
+#Remove A from sub names
+ID2 <- stress$ID %>%
+    str_replace("A",'')
+
+thr_ID2 <- thr$ID %>%
+    str_replace("A",'')
+
+dep_ID2 <- dep$ID %>%
+    str_replace("A",'')
+
+#Update stress df with new names
+stress <- stress %>%
+    mutate(ID = ID2)
+
+thr <- thr %>%
+    mutate(ID = thr_ID2) %>%
+    rename(endorse_thr_0 = endorse_thr) %>%
+    rename(avg_sev_0 = avg_sev) %>%
+    rename(worst_sev_0 = worst_sev)
+
+dep <- dep %>%
+    mutate(ID = dep_ID2)%>%
+    rename(endorse_dep_0 = endorse_dep)%>%
+    rename(avg_sev_0 = avg_sev) %>%
+    rename(worst_sev_0 = worst_sev)
+
+
+#Group by different metrics
+
+stress_avgsev_summed <- stress %>%
+    select(ID:avg_sev_29) %>%
+    mutate(summed_avgsev = rowSums(.[-1], na.rm=TRUE)) %>%
+    filter(summed_avgsev > 0)
+
+stress_worstsev_summed <- stress %>%
+    select(ID, worst_sev_0:worst_sev_29) %>%
+    mutate(summed_worstsev = rowSums(.[-1], na.rm=TRUE))%>%
+    filter(summed_worstsev > 0)
+
+ stress_numevents_summed <- stress %>%
+    select(ID, endorse_any_0:endorse_any_29) %>%
+    mutate(summed_numevents = rowSums(.[-1], na.rm=TRUE))%>%
+    filter(summed_numevents > 0)
+ 
+hist(stress_avgsev_summed$summed_avgsev,
+     nclass= 30,
+     ylim = range(0:15),
+     xlab='Average Severity of Endorsed Events',
+     ylab = 'Frequency',
+     main = 'Distribution of Average Severity of Stressful Events',
+     col=wes_palette('Rushmore1',15,type='c'))
+
+hist(stress_worstsev_summed$summed_worstsev,
+     nclass= 30,
+     ylim = range(0:15),
+     xlab='Worst Severity of Endorsed Events',
+     ylab = 'Frequency',
+     main = 'Distribution of Worst Severity of Stressful Events',
+     col=wes_palette('Rushmore1',15,type='c'))
+
+hist(stress_numevents_summed$summed_numevents,
+     nclass= 30,
+     ylim = range(0:15),
+     xlab='Number of Endorsed Events',
+     ylab = 'Frequency',
+     main = 'Distribution of Number of Stressful Events',
+     col=wes_palette('Rushmore1',10,type='c')) 
+
+
+```
+
+```{r}
+## PLOT FOR NUM EVENTS ALL EVENTS
+
+
+stress_long_numevents <- stress %>%
+    select(ID, endorse_any_0:endorse_any_29) %>%
+    pivot_longer(cols = endorse_any_0:endorse_any_29) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_numevents$name %>%
+    str_replace("endorse_any_",'') %>%
+    as.numeric()
+
+stress_long_numevents <- stress_long_numevents %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_numevents$summed_age, 
+        names.arg = stress_long_numevents$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:100),
+        ylab = 'Number of Events',
+        xlab = 'Age',
+        main = 'Cumulative Number of Reported Events Across Subjects by Age',
+        col = wes_palette('Darjeeling1', 30, type='c'))
+
+## PLOT FOR AVERAGE SEVERITY ALL EVENTS
+
+stress_long_avgsev <- stress %>%
+    select(ID, avg_sev_0:avg_sev_29) %>%
+    pivot_longer(cols = avg_sev_0:avg_sev_29) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_avgsev$name %>%
+    str_replace("avg_sev_",'') %>%
+    as.numeric()
+
+stress_long_avgsev <- stress_long_avgsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_avgsev$summed_age, 
+        names.arg = stress_long_avgsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Average Severity x Num Events',
+        xlab = 'Age',
+        main = 'Average Severity of Reported Events Across Subjects by Age',
+        col = wes_palette('Cavalcanti1', 25, type='c'))
+
+# PLOT FOR WORST SEVERITY ALL EVENTS
+
+stress_long_worstsev <- stress %>%
+    select(ID, worst_sev_0:worst_sev_29) %>%
+    pivot_longer(cols = worst_sev_0:worst_sev_29) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_worstsev$name %>%
+    str_replace("worst_sev_",'') %>%
+    as.numeric()
+
+stress_long_worstsev <- stress_long_worstsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_worstsev$summed_age, 
+        names.arg = stress_long_worstsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Worst Severity x Num Events',
+        xlab = 'Age',
+        main = 'Worst Severity of Reported Events Across Subjects by Age',
+        col = wes_palette('FantasticFox1', 25, type='c'))
+
+boxplot(stress_long_numevents$summed_age, stress_long_avgsev$summed_age,
+        stress_long_worstsev$summed_age,
+        ylab = "Summed Values",
+        names = c("Number of Events", "Average Severity", "Worst Severity"),
+        col=wes_palette("BottleRocket2"),
+        main="Distribution of All Events")
+
+```
+
+```{r}
+#THREAT: PLOT FOR NUMBER OF EVENTS
+
+thr_long_numevents <- thr %>%
+    select(ID, endorse_thr_0:endorse_thr_27) %>%
+    pivot_longer(cols = endorse_thr_0:endorse_thr_27) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- thr_long_numevents$name %>%
+    str_replace("endorse_thr_",'') %>%
+    as.numeric()
+
+thr_long_numevents <- thr_long_numevents %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(thr_long_numevents$summed_age, 
+        names.arg = thr_long_numevents$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylab = 'Number of Threat Events',
+        xlab = 'Age',
+        ylim = range(0:100),
+        main = 'Cumulative Reported Threat Events Across Subjects by Age',
+        col = wes_palette('Darjeeling1', 30, type='c'))
+
+## THREAT: PLOT FOR AVERAGE SEVERITY 
+
+stress_long_avgsev <- thr %>%
+    select(ID, avg_sev_0:avg_sev_27) %>%
+    pivot_longer(cols = avg_sev_0:avg_sev_27) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_avgsev$name %>%
+    str_replace("avg_sev_",'') %>%
+    as.numeric()
+
+stress_long_avgsev <- stress_long_avgsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_avgsev$summed_age, 
+        names.arg = stress_long_avgsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Average Severity x Num Events',
+        xlab = 'Age',
+        main = 'Average Severity of Reported Threat Events Across Subjects by Age',
+        col = wes_palette('Cavalcanti1', 25, type='c'))
+
+# THREAT: PLOT FOR WORST SEVERITY ALL EVENTS
+
+stress_long_worstsev <- thr %>%
+    select(ID, worst_sev_0:worst_sev_27) %>%
+    pivot_longer(cols = worst_sev_0:worst_sev_27) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_worstsev$name %>%
+    str_replace("worst_sev_",'') %>%
+    as.numeric()
+
+stress_long_worstsev <- stress_long_worstsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_worstsev$summed_age, 
+        names.arg = stress_long_worstsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Worst Severity x Num Events',
+        xlab = 'Age',
+        main = 'Worst Severity of Reported Threat Events Across Subjects by Age',
+        col = wes_palette('FantasticFox1', 25, type='c'))
+
+boxplot(stress_long_numevents$summed_age, stress_long_avgsev$summed_age,
+        stress_long_worstsev$summed_age,
+        ylab = "Summed Values",
+        names = c("Number of Events", "Average Severity", "Worst Severity"),
+        col=wes_palette("BottleRocket2"),
+        main="Distribution of Threat Events")
+
+```
+
+
+```{r}
+
+# DEP: NUMBER OF OCCURRANCES
+dep_long_numevents <- dep %>%
+    select(ID, endorse_dep_0:endorse_dep_22) %>%
+    pivot_longer(cols = endorse_dep_0:endorse_dep_22) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- dep_long_numevents$name %>%
+    str_replace("endorse_dep_",'') %>%
+    as.numeric()
+
+dep_long_numevents <- dep_long_numevents %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(dep_long_numevents$summed_age, 
+        names.arg = dep_long_numevents$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:100),
+        ylab = 'Number of Deprivation Events',
+        xlab = 'Age',
+        main = 'Cumulative Reported Deprivation Events Across Subjects by Age',
+        col = wes_palette('Darjeeling1', 30, type='c'))
+
+
+## DEP: PLOT FOR AVERAGE SEVERITY 
+
+stress_long_avgsev <- dep %>%
+    select(ID, avg_sev_0:avg_sev_22) %>%
+    pivot_longer(cols = avg_sev_0:avg_sev_22) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_avgsev$name %>%
+    str_replace("avg_sev_",'') %>%
+    as.numeric()
+
+stress_long_avgsev <- stress_long_avgsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_avgsev$summed_age, 
+        names.arg = stress_long_avgsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Average Severity x Num Events',
+        xlab = 'Age',
+        main = 'Average Severity of Reported Deprivation Events Across Subjects by Age',
+        col = wes_palette('Cavalcanti1', 25, type='c'))
+
+# Dep: PLOT FOR WORST SEVERITY ALL EVENTS
+
+stress_long_worstsev <- thr %>%
+    select(ID, worst_sev_0:worst_sev_22) %>%
+    pivot_longer(cols = worst_sev_0:worst_sev_22) %>%
+    group_by(name) %>%
+    na.omit() %>%
+    summarize(summed_age = sum(value)) 
+
+cleaned_age <- stress_long_worstsev$name %>%
+    str_replace("worst_sev_",'') %>%
+    as.numeric()
+
+stress_long_worstsev <- stress_long_worstsev %>%
+    mutate(age = cleaned_age) %>%
+    arrange(age)
+
+barplot(stress_long_worstsev$summed_age, 
+        names.arg = stress_long_worstsev$age,
+        cex.names = .5,
+        cex.axis = 1,
+        ylim = range(0:500),
+        ylab = 'Worst Severity x Num Events',
+        xlab = 'Age',
+        main = 'Worst Severity of Reported Deprivation Events Across Subjects by Age',
+        col = wes_palette('FantasticFox1', 25, type='c'))
+
+boxplot(stress_long_numevents$summed_age, stress_long_avgsev$summed_age,
+        stress_long_worstsev$summed_age,
+        ylab = "Summed Values",
+        names = c("Number of Events", "Average Severity", "Worst Severity"),
+        col=wes_palette("BottleRocket2"),
+        main="Distribution of Deprivation Events")
+
+````
+
+
+
