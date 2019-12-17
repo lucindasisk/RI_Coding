@@ -1,0 +1,197 @@
+---
+title: "Example_PenalizedRegression"
+author: "Lucinda Sisk"
+date: "9/19/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+```{r, tidy=TRUE, include=FALSE}
+
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+trauma_vars <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/LS_results/Cleaned_WIDE_any_endorsements_2019-11-19.csv') 
+trauma_vars[is.na(trauma_vars)]<-0
+
+shapes_roi <- read_csv('/Users/lucindasisk/Box/LS_Folders/CANDLab_LS/TraumaData/SK_data/radom_forest_shapes_ROI_data_dropped.csv') %>%
+ drop_na()
+
+stress <- inner_join(shapes_roi, trauma_vars, by = 'subjectid') %>%
+  rename(sex = sex_at_birth, 
+         endorse_any_0 = endorse_any,
+         avg_sev_0 = avg_sev,
+         worst_sev_0 = worst_sev,
+         age = Age_scan) 
+
+```
+
+### Random Forest Modeling
+
+"Random Forest is an ensemble machine learning technique capable of performing both regression and classification tasks using multiple decision trees and a statistical technique called bagging. Bagging along with boosting are two of the most popular ensemble techniques which aim to tackle high variance and high bias. - [Link here](https://gdcoder.com/random-forest-regressor-explained-in-depth)"
+
+Helpful conceptual resorce: [Towards Data Science](https://towardsdatascience.com/understanding-random-forest-58381e0602d2)
+
+Random Forest in R Tutorial: [Link Here](https://towardsdatascience.com/random-forest-in-r-f66adf80ec9)
+
+R-bloggers Random Forest in depth:[Link Here](https://www.r-bloggers.com/random-forests-in-r/)
+
+Berkeley Stats Information Page: [Link Here](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm)
+
+A Random Forest Guided Tour: Introductory paper [Link Here](https://www.normalesup.org/~scornet/paper/test.pdf)
+
+```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+library(randomForest)
+require(caTools)
+
+#Check that variables in dummy dataset are coded correctly
+sapply(stress, class)
+
+#Recode sex as factor; rest are correct
+stress <- stress %>%
+  transform(sex=as.factor(sex))
+
+#Split data into training and testing]
+sample <-  sample.split(stress$subjectid, SplitRatio = .50)
+
+train <- subset(stress, sample == TRUE) %>%
+  dplyr::select('R_hipp_avg_ABminusvsACminus', 'avg_sev_0':'worst_sev_29') %>%
+  data.frame() 
+
+test <- subset(stress, sample == FALSE) %>%
+  dplyr::select('R_hipp_avg_ABminusvsACminus', 'avg_sev_0':'worst_sev_29') %>%
+  data.frame() 
+
+dim(train)
+dim(test)
+
+
+#Next, we initialize an instance of the randomForest class. Unlike scikit-learn, we don’t need to explicily call the fit method to train our model.
+rf_mod <- randomForest(R_hipp_avg_ABminusvsACminus ~., 
+                   data=train)
+
+#View output
+rf_mod
+
+#plot
+plot(rf_mod)
+
+#By default, the number of decision trees in the forest is 500 and the number of features used as potential candidates for each split is 3. The model will automatically attempt to classify each of the samples in the Out-Of-Bag dataset and display a confusion matrix with the results.
+
+#Now, we use our model to predict whether the people in our testing set have heart disease.
+(pred = predict(rf_mod, newdata=test %>%
+                  select(-c(R_hipp_avg_ABminusvsACminus))))
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+## Example from internet: [Link Here](https://towardsdatascience.com/random-forest-in-r-f66adf80ec9)
+```{r, tidy = TRUE, tidy.opts=list(width.cutoff=60)}
+
+#Random Forest Example
+
+library(randomForest)
+require(caTools)
+
+#Download data
+data <- read.csv(
+  "~/Downloads/processed.cleveland.data",
+  header=FALSE
+)
+
+#Check data dimensions
+dim(data)
+
+#Specify column names
+names(data) <- c("age", "sex", "cp", "trestbps", "choi", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thai", "num")
+
+#Check data
+head(data)
+
+# To simplify the problem, we’re only going to attempt to distinguish the presence of heart disease (values 1,2,3,4) from absence of heart disease (value 0). Therefore, we replace all labels greater than 1 by 1.
+data$num[data$num > 1] <- 1
+
+#Check summary data to make sure categorical variables are being correctly classified
+summary(data)
+
+#View type of each column
+sapply(data, class)
+
+#As we can see, sex is incorrectly treated as a number when in reality it can only be 1 if male and 0 if female. We can use the transform method to change the in built type of each feature.
+
+data <- transform(
+  data,
+  age=as.integer(age),
+  sex=as.factor(sex),
+  cp=as.factor(cp),
+  trestbps=as.integer(trestbps),
+  choi=as.integer(choi),
+  fbs=as.factor(fbs),
+  restecg=as.factor(restecg),
+  thalach=as.integer(thalach),
+  exang=as.factor(exang),
+  oldpeak=as.numeric(oldpeak),
+  slope=as.factor(slope),
+  ca=as.factor(ca),
+  thai=as.factor(thai),
+  num=as.factor(num)
+)
+sapply(data, class)
+
+#Now, the categorical variables are expressed as the counts for each respective class. The ca and thai of certain samples are ? indicating missing values. R expects missing values to be written as NA. After replacing them, we can use the colSums function to view the missing value counts of each column.
+
+data[ data == "?"] <- NA
+colSums(is.na(data))
+
+#we’re just going to replace the missing values for thai with what is considered normal. Next, we’re going to drop the rows where ca is missing.
+data$thai[which(is.na(data$thai))] <- as.factor("3.0")
+data <- data[!(data$ca %in% c(NA)),]
+colSums(is.na(data))
+
+#If we run summary again, we’ll see that it still views ? as a potential class.
+summary(data)
+
+#To get around this issue, we cast the columns to factors.
+data$ca <- factor(data$ca)
+data$thai <- factor(data$thai)
+summary(data)
+
+#We’re going to set a portion of our data aside for testing.
+sample = sample.split(data$num, SplitRatio = .75)
+train = subset(data, sample == TRUE)
+test  = subset(data, sample == FALSE)
+dim(train)
+dim(test)
+
+#Next, we initialize an instance of the randomForest class. Unlike scikit-learn, we don’t need to explicily call the fit method to train our model.
+rf_modelStress <- randomForest(
+  num ~ .,
+  data=train
+)
+
+#By default, the number of decision trees in the forest is 500 and the number of features used as potential candidates for each split is 3. The model will automatically attempt to classify each of the samples in the Out-Of-Bag dataset and display a confusion matrix with the results.
+
+#Now, we use our model to predict whether the people in our testing set have heart disease.
+
+pred = predict(rf_modelStress, newdata=test[-14])
+pred
+# Since this is a classification problem, we use a confusion matrix to evaluate the performance of our model. Recall that values on the diagonal correspond to true positives and true negatives (correct predictions) whereas the others correspond to false positives and false negatives.
+(cm = table(test[,14], pred))
+
+```
+

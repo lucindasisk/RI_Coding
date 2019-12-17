@@ -190,11 +190,11 @@ Code derived from [**stack overflow - click for link **](https://stackoverflow.c
 
 ```{r}
 #Subset example data into predictor and outcome variables
-stress_age_vars <- stress_arrange[2:56,2:32]
-predictor_stress <- model.matrix(~., stress_age_vars)
+stress_age_vars <- stress_arrange[2:56,2:32] %>% na.omit()
+predictor_stress <- model.matrix(~., stress_age_vars) %>% na.omit()
 #covariate_vars <- stress[["sex"]][2:length(stress)]
 #covariate_matrix <- model.matrix(covariate_vars)
-outcome_stress <- stress$brain_dv_1[2:56] 
+outcome_stress <- stress$brain_dv_1[2:56] %>% na.omit()
 
 #Set Penalty factors for sex (https://cran.r-project.org/web/packages/glmnet/vignettes/glmnet_beta.pdf)
 pfac <- rep(1,32)
@@ -245,7 +245,10 @@ summary(m2)
 m3 <- lm(brain_dv_1~endorse_any_17 + sex, stress)
 summary(m3)
 
-plot(x=stress$endorse_any_17, y=stress$brain_dv_1, xlim=c(0,5))
+m_allpreds <- lm(brain_dv_1 ~ endorse_any_12 + endorse_any_13 + endorse_any_17 + sex,
+                 stress)
+summary(m_allpreds)
+#plot(x=stress$endorse_any_17, y=stress$brain_dv_1, xlim=c(0,5))
 ```
 
 ```{r}
